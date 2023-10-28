@@ -2,16 +2,16 @@
 HW2 problem
 '''
 
-import sys
 import os
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy import stats
-import scipy.special as sp
+import sys
 import time
-from scipy.optimize import minimize
 
 import data_generator as dg
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.special as sp
+from scipy import stats
+from scipy.optimize import minimize
 
 # you can define/use whatever functions to implememt
 
@@ -19,21 +19,28 @@ import data_generator as dg
 # cross entropy loss
 ########################################
 def cross_entropy_softmax_loss(Wb, x, y, num_class, n, feat_dim):
+    # Reshape the input Wb into W and b
     Wb = np.reshape(Wb, (-1, 1))
     b = Wb[-num_class:]
     W = np.reshape(Wb[range(num_class * feat_dim)], (num_class, feat_dim))
     
+    # Reshape input data x into the desired shape
     x = np.reshape(x.T, (-1, n))
     
+    # Calculate the unnormalized scores
     s = W @ x + b
     
+    # Compute the softmax probabilities
     softmax = np.exp(s) / np.sum(np.exp(s), axis=0)
     
+    # Create a one-hot encoding of the ground truth labels
     y_one_hot = np.zeros((num_class, n))
     y_one_hot[y, np.arange(n)] = 1
     
+    # Calculate the cross-entropy loss for each data point
     loss_per_datapoint = -np.sum(y_one_hot * np.log(softmax), axis=0)
     
+    # Average the cross-entropy losses over the dataset
     average_loss = np.mean(loss_per_datapoint)
     
     return average_loss
