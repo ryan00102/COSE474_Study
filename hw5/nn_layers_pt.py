@@ -1,6 +1,8 @@
 """
 
-HW4
+nn_layers_pt.py
+
+PyTorch version of nn_layers
 
 """
 
@@ -9,7 +11,6 @@ import numbers
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 """
@@ -178,6 +179,9 @@ class nn_convolutional_layer:
         self.W.requires_grad = True
         self.b.requires_grad = True
 
+        self.v_W = torch.zeros_like(self.W)
+        self.v_b = torch.zeros_like(self.b)
+        
         self.input_size = input_size
 
     def update_weights(self, dW, db):
@@ -191,149 +195,122 @@ class nn_convolutional_layer:
         self.W = W.clone().detach()
         self.b = b.clone().detach()
 
-    #######
-    # Q1. Complete this method
-    #######
     def forward(self, x):
-      X1, C, H1, W1 = x.shape
-      X2, C, H2, W2 = self.W.shape
-      f_size = (C*H2*W2)
-      stride = 1
         
-      H_out = int(1 + (H1 - H2)/stride)
-      W_out = int(1 + (W1 - W2)/stride)
-      out = torch.zeros((X1, X2, H_out, W_out))
-
-      for h in range(H_out):
-        for w in range(W_out):
-          x_crop = x[torch.arange(X1), :, h*stride:h*stride+H2, w*stride:w*stride+W2]
-          x_crop_flatten = x_crop.reshape(X1, f_size)
-          w_flatten = self.W.reshape(X2, f_size)
-          sp_out = torch.matmul(x_crop_flatten, w_flatten.T) + self.b.reshape((1, X2))
-          out[torch.arange(X1), :, h, w] = sp_out
-
-      return out
-
+        ###################################
+        # Q4. Implement your layer here
+        ###################################
+        pass
+        
     
+    def step(self, lr, friction):
+        with torch.no_grad():
+            self.v_W = friction*self.v_W + (1-friction)*self.W.grad
+            self.v_b = friction*self.v_b + (1-friction)*self.b.grad
+            self.W -= lr*self.v_W
+            self.b -= lr*self.v_b
+            
+            self.W.grad.zero_()
+            self.b.grad.zero_()
 
-    #######
-    ## If necessary, you can define additional class methods here
-    #######
-
-
+# max pooling
 class nn_max_pooling_layer:
     def __init__(self, pool_size, stride):
         self.stride = stride
         self.pool_size = pool_size
-        #######
-        ## If necessary, you can define additional class variables here
-        #######
 
-    #######
-    # Q2. Complete this method
-    #######
     def forward(self, x):
-      X, C, W, H = x.shape
-      W_pool = self.pool_size
-      H_pool = self.pool_size
-      stride = self.stride
+        ###################################
+        # Q5. Implement your layer here
+        ###################################
+        pass
 
-      W_out = int(1 + (W - W_pool) / stride)
-      H_out = int(1 + (H - H_pool) / stride)
-      out = torch.zeros((X,C, W_out, H_out))
+# relu activation
+class nn_activation_layer:
 
-      for b in range(X):
-          for c in range(C):
-              for w in range(W_out):
-                  for h in range(H_out):
-                      W_str = w*stride
-                      H_str = h*stride
-                      f_recep = x[b, c, W_str:W_str+W_pool, H_str:H_str+H_pool]
-                      out[b,c,w,h] = torch.max(f_recep)
-      return out
+    # linear layer. creates matrix W and bias b
+    # W is in by out, and b is out by 1
+    def __init__(self):
+        pass
 
+    def forward(self, x):
+        return x.clamp(min=0)
+
+# fully connected (linear) layer
+class nn_fc_layer:
+
+    def __init__(self, input_size, output_size, std=1):
+        
+        # Xavier/He init
+        self.W = torch.normal(0, std/math.sqrt(input_size/2), (output_size, input_size))
+        self.b=0.01+torch.zeros((output_size))
+
+        self.W.requires_grad = True
+        self.b.requires_grad = True
+
+        self.v_W = torch.zeros_like(self.W)
+        self.v_b = torch.zeros_like(self.b)
+
+    ## Q1
+    def forward(self,x):
+        # compute forward pass of given parameter
+        # output size is batch x output_size x 1 x 1
+        # input size is batch x input_size x filt_size x filt_size
+        output_size = self.W.shape[0]
+        batch_size = x.shape[0]
+        Wx = torch.mm(x.reshape((batch_size, -1)),(self.W.reshape(output_size, -1)).T)
+        out = Wx+self.b
+        return out
+
+    def update_weights(self,dLdW,dLdb):
+
+        # parameter update
+        self.W=self.W+dLdW
+        self.b=self.b+dLdb
+
+    def get_weights(self):
+        return self.W.clone().detach(), self.b.clone().detach()
+
+    def set_weights(self, W, b):
+        self.W = W.clone().detach()
+        self.b = b.clone().detach()
     
-    #######
-    ## If necessary, you can define additional class methods here
-    #######
-
-"""
-TESTING 
-"""
-
-if __name__ == "__main__":
-
-    # data sizes
-    batch_size = 8
-    input_size = 32
-    filter_width = 3
-    filter_height = filter_width
-    in_ch_size = 3
-    num_filters = 8
-
-    std = 1e0
-    dt = 1e-3
-
-    # number of test loops
-    num_test = 50
-
-    # error parameters
-    err_fwd = 0
-    err_pool = 0
-
-
-    # for reproducibility
-    # torch.manual_seed(0)
-
-    # set default type to float64
-    torch.set_default_dtype(torch.float64)
-
-    print('conv test')
-    for i in range(num_test):
-        # create convolutional layer object
-        cnv = nn_convolutional_layer(filter_height, filter_width, input_size,
-                                   in_ch_size, num_filters)
-
-        # test conv layer from torch.nn for reference
-        test_conv_layer = nn.Conv2d(in_channels=in_ch_size, out_channels=num_filters,
-                                kernel_size = (filter_height, filter_width))
-        
-        # test input
-        x = torch.normal(0, 1, (batch_size, in_ch_size, input_size, input_size))
-        
+    def step(self, lr, friction):
         with torch.no_grad():
-            
-            out = cnv.forward(x)
-            W,b = cnv.get_weights()
-            test_conv_layer.weight = nn.Parameter(W)
-            test_conv_layer.bias = nn.Parameter(torch.squeeze(b))
-            test_out = test_conv_layer(x)
-            
-            err=torch.norm(test_out - out)/torch.norm(test_out)
-            err_fwd+= err
-    
-    stride = 2
-    pool_size = 2
-    
-    print('pooling test')
-    for i in range(num_test):
-        # create pooling layer object
-        mpl = nn_max_pooling_layer(pool_size=pool_size, stride=stride)
-        
-        # test pooling layer from torch.nn for reference
-        test_pooling_layer = nn.MaxPool2d(kernel_size=(pool_size,pool_size), stride=stride)
-        
-        # test input
-        x = torch.normal(0, 1, (batch_size, in_ch_size, input_size, input_size))
-        
-        with torch.no_grad():
-            out = mpl.forward(x)
-            test_out = test_pooling_layer(x)
-            
-            err=torch.norm(test_out - out)/torch.norm(test_out)
-            err_pool+= err
+            self.v_W = friction*self.v_W + (1-friction)*self.W.grad
+            self.v_b = friction*self.v_b + (1-friction)*self.b.grad
+            self.W -= lr*self.v_W
+            self.b -= lr*self.v_b
+            self.W.grad.zero_()
+            self.b.grad.zero_()
 
-    # reporting accuracy results.
-    print('accuracy results')
-    print('forward accuracy', 100 - err_fwd/num_test*100, '%')
-    print('pooling accuracy', 100 - err_pool/num_test*100, '%')
+
+# softmax layer
+class nn_softmax_layer:
+    def __init__(self):
+        pass
+
+    def forward(self, x):
+        s = x - torch.unsqueeze(torch.amax(x, axis=1), -1)
+        return (torch.exp(s) / torch.unsqueeze(torch.sum(torch.exp(s), axis=1), -1)).reshape((x.shape[0],x.shape[1]))
+
+
+# cross entropy layer
+class nn_cross_entropy_layer:
+    def __init__(self):
+        self.eps=1e-15
+
+    def forward(self, x, y):
+        # first get softmax
+        batch_size = x.shape[0]
+        num_class = x.shape[1]
+        
+        onehot = np.zeros((batch_size, num_class))
+        onehot[range(batch_size), (np.array(y)).reshape(-1, )] = 1
+        onehot = torch.as_tensor(onehot)
+
+        # avoid numerial instability
+        x[x<self.eps]=self.eps
+        x=x/torch.unsqueeze(torch.sum(x,axis=1), -1)
+
+        return sum(-torch.sum(torch.log(x.reshape(batch_size, -1)) * onehot, axis=0)) / batch_size
