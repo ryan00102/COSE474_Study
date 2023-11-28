@@ -200,7 +200,25 @@ class nn_convolutional_layer:
         ###################################
         # Q4. Implement your layer here
         ###################################
-        pass
+        X1, C, H1, W1 = x.shape
+        X2, C, H2, W2 = self.W.shape
+        f_size = (C*H2*W2)
+        stride = 1
+        
+        H_out = int(1 + (H1 - H2)/stride)
+        W_out = int(1 + (W1 - W2)/stride)
+        out = torch.zeros((X1, X2, H_out, W_out))
+
+        for h in range(H_out):
+            for w in range(W_out):
+                x_crop = x[torch.arange(X1), :, h*stride:h*stride+H2, w*stride:w*stride+W2]
+                x_crop_flatten = x_crop.reshape(X1, f_size)
+                w_flatten = self.W.reshape(X2, f_size)
+                sp_out = torch.matmul(x_crop_flatten, w_flatten.T) + self.b.reshape((1, X2))
+                out[torch.arange(X1), :, h, w] = sp_out
+
+        return out
+        
         
     
     def step(self, lr, friction):
@@ -223,7 +241,20 @@ class nn_max_pooling_layer:
         ###################################
         # Q5. Implement your layer here
         ###################################
-        pass
+        result = np.zeros(shape = (x.shape[0], x.shape[1], x.shape[2]//2, x.shape[3]//2))
+        
+        for i in range(x.shape[0]):  
+            result_f = np.zeros(shape = (result.shape[1], result.shape[2], result.shape[3]))
+            
+            for j in range(x.shape[1]):   
+                y = view_as_windows(x[i][j], (self.pool_size, self.pool_size), step = self.stride)     
+                map_pool = np.max(y, axis=(2, 3))  
+                result_f[j] = map_pool
+            
+            result[i] = result_f
+
+        return result
+        
 
 # relu activation
 class nn_activation_layer:
