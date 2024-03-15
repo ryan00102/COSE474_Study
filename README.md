@@ -1,2 +1,2 @@
-# DeepLearning
+# Korea University Deep Learning class assignments
 
